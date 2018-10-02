@@ -67,7 +67,7 @@ static int write_image(float *image, int width, int height, int pd,
 
     uint8_t *image_u8 = NULL;
     enum {
-        BMP_FORMAT, JPEG_FORMAT, PNG_FORMAT, TIFF_FORMAT
+        BMP_FORMAT, JPEG_FORMAT, PNG_FORMAT, HDR_FORMAT
     } fileformat;
     int success = 0;
 
@@ -84,43 +84,50 @@ static int write_image(float *image, int width, int height, int pd,
         fileformat = JPEG_FORMAT;
     } else if (string_ends_with(filename, ".png")) {
         fileformat = PNG_FORMAT;
+    } else if (string_ends_with(filename, ".hdr")) {
+        fileformat = HDR_FORMAT;
     } else {
         fprintf(stderr, "Failed to write \"%s\".\n", filename);
 
         return 0;
     }
-    size_t size = width * height * pd;
     const int num_channels = pd;
-    image_u8 = (uint8_t *) calloc(size, sizeof(uint8_t));
-    if (image_u8 == NULL) {
-        fprintf(stderr, "Failed to write \"%s\".\n", filename);
-        return success;
-    }
-    for (int i = 0; i < size; ++i) {
-        image_u8[i] = ClampToByte(image[i] * 255.0f);
-    }
-
-    switch (fileformat) {
-        case BMP_FORMAT:
-            success = stbi_write_bmp(filename, width, height, num_channels, image_u8);
-            break;
-        case JPEG_FORMAT:
-            success = stbi_write_jpg(filename, width, height, num_channels, image_u8, quality);
-            break;
-        case PNG_FORMAT:
-            success = stbi_write_png(filename, width, height, num_channels, image_u8, 0);
-            break;
+    if (fileformat != HDR_FORMAT) {
+        size_t size = width * height * pd;
+        image_u8 = (uint8_t *) calloc(size, sizeof(uint8_t));
+        if (image_u8 == NULL) {
+            fprintf(stderr, "Failed to write \"%s\".\n", filename);
+            return success;
+        }
+        for (int i = 0; i < size; ++i) {
+            image_u8[i] = ClampToByte(image[i] * 255.0f);
+        }
+        switch (fileformat) {
+            case BMP_FORMAT:
+                success = stbi_write_bmp(filename, width, height, num_channels, image_u8);
+                break;
+            case JPEG_FORMAT:
+                success = stbi_write_jpg(filename, width, height, num_channels, image_u8, quality);
+                break;
+            case PNG_FORMAT:
+                success = stbi_write_png(filename, width, height, num_channels, image_u8, 0);
+                break;
+        }
+        free(image_u8);
+    } else {
+        success = stbi_write_hdr(filename, width, height, num_channels, image);
     }
     if (!success)
         fprintf(stderr, "Failed to write \"%s\".\n", filename);
 
-    free(image_u8);
+
     return success;
 }
 
 float *iio_read_image(const std::string &fname, int *w, int *h, int *pd) {
     return read_image(w, h, (char *) fname.c_str(), pd);
 }
+
 void iio_write_image(const std::string &filename, float *x, int w, int h, int pd) {
     write_image(x, w, h, pd, (char *) filename.c_str(), 100);
 }
